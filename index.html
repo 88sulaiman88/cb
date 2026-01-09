@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>حاسبة الكاش باك</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f7f7f7; padding:20px; }
+    .card { background:#fff; padding:20px; border-radius:12px; max-width:520px; margin:auto; box-shadow:0 4px 10px rgba(0,0,0,0.1); }
+    label { display:block; margin-top:15px; font-weight:bold; }
+    input, select, button { width:100%; padding:10px; margin-top:8px; border-radius:8px; border:1px solid #ccc; }
+    button { background:#2b59c3; color:#fff; font-size:16px; cursor:pointer; }
+    button:active { transform: translateY(1px); }
+    .result { margin-top:20px; font-size:18px; font-weight:bold; color:#0a7a3c; }
+    .hint { margin-top:8px; font-size:12px; color:#666; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>حاسبة الاسترداد النقدي</h2>
+
+    <label>قيمة العملية (ريال)</label>
+    <input type="number" id="amount" placeholder="أدخل المبلغ" inputmode="decimal" />
+
+    <label>البنك</label>
+    <select id="bank" onchange="updateCategories()">
+      <option value="">اختر البنك</option>
+      <option value="rajhi">الراجحي - كاش باك بلس</option>
+      <option value="snb">الأهلي - الاسترداد الفئة المميزة</option>
+      <option value="nayifat">النايفات</option>
+      <option value="enbd">بنك الإمارات دبي الوطني - مزيد</option>
+      <option value="alinma">الإنماء - انفينيت</option>
+    </select>
+
+    <label>نوع العملية</label>
+    <select id="category">
+      <option value="">اختر البنك أولاً</option>
+    </select>
+
+    <button type="button" onclick="calculateCashback()">احسب الكاش باك</button>
+
+    <div class="result" id="result"></div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <script>
+    // نسب الكاش باك والتصنيفات حسب البنك فقط (بدون نوع بطاقة)
+    // ملاحظة: بعض الفئات لديها حد أقصى للاسترداد (cap) ويتم تطبيقه لكل عملية.
+    const rates = {
+      rajhi: {
+        restaurants: { label: 'مطاعم وكافيهات', rate: 0.10 },
+        supermarket: { label: 'سوبرماركت', rate: 0.06 },
+        online: { label: 'متاجر إلكترونية', rate: 0.02 },
+        international: { label: 'مشتريات دولية', rate: 0.015 },
+        other: { label: 'أخرى', rate: 0.005 }
+      },
+      snb: {
+        fuel: { label: 'محطات البنزين', rate: 0.11 },
+        restaurants: { label: 'المطاعم المحلية', rate: 0.05 },
+        supermarket: { label: 'السوبرماركت', rate: 0.05 },
+        pharmacy: { label: 'الصيدليات', rate: 0.05 },
+        international: { label: 'العمليات الدولية', rate: 0.02 },
+        other: { label: 'أخرى', rate: 0.007 }
+      },
+      nayifat: {
+        restaurants: { label: 'مطاعم', rate: 0.05 },
+        supermarket: { label: 'سوبرماركت', rate: 0.03 },
+        online: { label: 'خدمات رقمية', rate: 0.01 },
+        travel: { label: 'سفر وفنادق', rate: 0.015 },
+        other: { label: 'أخرى', rate: 0.0025 }
+      },
+      enbd: {
+        restaurants: { label: 'المطاعم', rate: 0.10 },
+        grocery: { label: 'البقالة', rate: 0.05 },
+        medical: { label: 'الخدمات الطبية والصيدليات', rate: 0.05 },
+        education: { label: 'المدارس والتعليم', rate: 0.05 },
+        travel: { label: 'شركات الطيران والفنادق', rate: 0.02 },
+        other: { label: 'جميع الفئات الأخرى', rate: 0.005 }
+      },
+      alinma: {
+        other: { label: 'أخرى', rate: 0.0204 },
+        realestate: { label: 'عقارات', rate: 0.0204, cap: 401.6 },
+        maintenance_auto: { label: 'خدمات الصيانة ووكالات السيارات', rate: 0.0204, cap: 200.8 },
+        schools_universities: { label: 'المدارس والجامعات', rate: 0.0204, cap: 200.8 }
+      }
+    };
+
+    function setHint(text) {
+      document.getElementById('hint').innerText = text || '';
+    }
+
+    // تحديث التصنيفات عند اختيار البنك
+    function updateCategories() {
+      const bank = document.getElementById('bank').value;
+      const categorySelect = document.getElementById('category');
+      const resultEl = document.getElementById('result');
+
+      // reset UI
+      resultEl.innerText = '';
+      setHint('');
+      categorySelect.innerHTML = '';
+
+      if (!bank || !rates[bank]) {
+        categorySelect.innerHTML = '<option value="">اختر البنك أولاً</option>';
+        return;
+      }
+
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'اختر نوع العملية';
+      categorySelect.appendChild(placeholder);
+
+      Object.keys(rates[bank]).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = rates[bank][key].label;
+        categorySelect.appendChild(opt);
+      });
+    }
+
+    // حساب الكاش باك
+    function calculateCashback() {
+      const amount = parseFloat(document.getElementById('amount').value);
+      const bank = document.getElementById('bank').value;
+      const category = document.getElementById('category').value;
+      const resultEl = document.getElementById('result');
+
+      setHint('');
+
+      if (!amount || amount <= 0 || !bank || !rates[bank] || !category || !rates[bank][category]) {
+        resultEl.innerText = 'الرجاء إدخال جميع البيانات بشكل صحيح';
+        return;
+      }
+
+      const config = rates[bank][category];
+      let cashback = amount * config.rate;
+      let capped = false;
+
+      // تطبيق الحد الأقصى إن وجد (لكل عملية)
+      if (typeof config.cap === 'number' && cashback > config.cap) {
+        cashback = config.cap;
+        capped = true;
+      }
+
+      resultEl.innerText = `قيمة الكاش باك: ${cashback.toFixed(2)} ريال`;
+      if (capped) {
+        setHint(`تم تطبيق الحد الأقصى لهذه الفئة: ${config.cap.toFixed(2)} ريال`);
+      }
+    }
+
+    /*
+      حالات اختبار (Test Cases):
+      1) مبلغ 100 ريال – الراجحي – مطاعم → الناتج 10 ريال
+      2) مبلغ 200 ريال – الأهلي – بنزين → الناتج 22 ريال
+      3) مبلغ 1000 ريال – النايفات – سفر → الناتج 15 ريال
+      4) عدم اختيار بنك أو تصنيف → رسالة خطأ
+      5) مبلغ 200 ريال – الإمارات دبي الوطني – المطاعم → الناتج 20 ريال
+      6) مبلغ 20000 ريال – الإنماء – خدمات الصيانة ووكالات السيارات → الناتج 200.80 ريال (تطبيق حد أقصى)
+      7) مبلغ 30000 ريال – الإنماء – عقارات → الناتج 401.60 ريال (تطبيق حد أقصى)
+      8) مبلغ 30000 ريال – الإنماء – أخرى → الناتج 612.00 ريال (بدون حد أقصى)
+      9) مبلغ 20000 ريال – الإنماء – المدارس والجامعات → الناتج 200.80 ريال (تطبيق حد أقصى)
+    */
+  </script>
+</body>
+</html>
