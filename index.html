@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title> حاسبة الكاش باك - سليمان</title>
+  <title> حاسبة الكاش باك (سليمان)</title>
   <style>
     body { font-family: Arial, sans-serif; background:#f7f7f7; padding:20px; }
     .card { background:#fff; padding:20px; border-radius:12px; max-width:520px; margin:auto; box-shadow:0 4px 10px rgba(0,0,0,0.1); }
@@ -95,5 +95,164 @@
 
     // تحديث التصنيفات عند اختيار البنك
     function updateCategories() {
-      const bank = document.getElementB
+      const bank = document.getElementById('bank').value;
+      const categorySelect = document.getElementById('category');
+      const resultEl = document.getElementById('result');
 
+      // reset UI
+      resultEl.innerText = '';
+      setHint('');
+      setPercent('');
+      setRecommend('');
+      categorySelect.innerHTML = '';
+
+      if (!bank || !rates[bank]) {
+        categorySelect.innerHTML = '<option value="">اختر البنك أولاً</option>';
+        return;
+      }
+
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'اختر نوع العملية';
+      categorySelect.appendChild(placeholder);
+
+      Object.keys(rates[bank]).forEach(key => {
+        // عناصر داخلية (مثل حد البنك) لا تظهر للمستخدم
+        if (key.startsWith('_')) return;
+
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = rates[bank][key].label;
+        categorySelect.appendChild(opt);
+      });
+    }
+
+    // حساب الكاش باك
+    function calculateCashback() {
+      const amount = parseFloat(document.getElementById('amount').value);
+      const bank = document.getElementById('bank').value;
+      const category = document.getElementById('category').value;
+      const resultEl = document.getElementById('result');
+
+      setHint('');
+      setPercent('');
+      setRecommend('');
+
+      if (!Number.isFinite(amount) || amount <= 0 || !bank || !rates[bank] || !category || !rates[bank][category]) {
+        resultEl.innerText = 'الرجاء إدخال جميع البيانات بشكل صحيح';
+        return;
+      }
+
+      const config = rates[bank][category];
+      const bankCap = (bank === 'rajhi' && rates.rajhi._bankCap && typeof rates.rajhi._bankCap.cap === 'number')
+        ? rates.rajhi._bankCap.cap
+        : null;
+
+      let cashback = amount * config.rate;
+      let capped = false;
+
+      // تطبيق الحد الأقصى للفئة إن وجد (لكل عملية)
+      if (typeof config.cap === 'number' && cashback > config.cap) {
+        cashback = config.cap;
+        capped = true;
+      }
+
+      // تطبيق الحد الأقصى الإجمالي للبنك (الراجحي) إن وجد (لكل عملية)
+      if (typeof bankCap === 'number' && cashback > bankCap) {
+        cashback = bankCap;
+        capped = true;
+      }
+
+      resultEl.innerText = `قيمة الكاش باك: ${cashback.toFixed(2)} ريال`;
+
+      const baseRatePct = (config.rate * 100);
+      let percentLine = `نسبة الكاش باك: ${baseRatePct.toFixed(2)}%`;
+
+      // إذا تم تطبيق الحد، اعرض النسبة الفعلية بعد الحد
+      if (capped) {
+        const effectivePct = (cashback / amount) * 100;
+        percentLine += ` (النسبة الفعلية بعد الحد: ${effectivePct.toFixed(2)}%)`;
+      }
+
+      setPercent(percentLine);
+
+      // توصيات خاصة
+      // الراجحي
+      if (bank === 'rajhi' && category === 'online') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الإنماء إنفينيت.');
+      } else if (bank === 'rajhi' && category === 'other') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الإنماء إنفينيت.');
+      } else if (bank === 'rajhi' && category === 'international') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي برق أو D360.');
+
+      // الأهلي
+      } else if (bank === 'snb' && category === 'restaurants') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الراجحي كاش باك بلس أو النايفات.');
+      } else if (bank === 'snb' && category === 'supermarket') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الراجحي كاش بلس.');
+      } else if (bank === 'snb' && category === 'international') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي برق أو D360.');
+      } else if (bank === 'snb' && category === 'other') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الإنماء إنفينيت.');
+
+      // النايفات
+      } else if (bank === 'nayifat' && category === 'supermarket') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الراجحي كاش باك بلس.');
+      } else if (bank === 'nayifat' && category === 'online') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الإنماء إنفينيت.');
+      } else if (bank === 'nayifat' && category === 'travel') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الإنماء إنفينيت.');
+      } else if (bank === 'nayifat' && category === 'other') {
+        setRecommend('ملاحظة: أفضل بطاقة لهذه العملية هي الإنماء إنفينيت.');
+      } else {
+        setRecommend('');
+      }
+
+      if (capped) {
+        // تحديد أي حد تم تطبيقه (حد الفئة أو حد البنك)
+        let appliedCap = null;
+        if (typeof config.cap === 'number') appliedCap = config.cap;
+        if (typeof bankCap === 'number') {
+          if (appliedCap === null || bankCap < appliedCap || cashback === bankCap) {
+            appliedCap = bankCap;
+          }
+        }
+
+        if (typeof appliedCap === 'number') {
+          setHint(`تم تطبيق الحد الأقصى: ${appliedCap.toFixed(2)} ريال`);
+        } else {
+          setHint('تم تطبيق حد أقصى.');
+        }
+      }
+    }
+
+    /*
+      حالات اختبار (Test Cases):
+      1) مبلغ 100 ريال – الراجحي – مطاعم → الناتج 10 ريال
+      2) مبلغ 200 ريال – الأهلي – بنزين → الناتج 22 ريال
+      3) مبلغ 1000 ريال – النايفات – سفر → الناتج 15 ريال
+      4) عدم اختيار بنك أو تصنيف → رسالة خطأ
+      6) مبلغ 20000 ريال – الإنماء – خدمات الصيانة ووكالات السيارات → الناتج 200.80 ريال (تطبيق حد أقصى)
+      7) مبلغ 30000 ريال – الإنماء – عقارات → الناتج 401.60 ريال (تطبيق حد أقصى)
+      8) مبلغ 30000 ريال – الإنماء – أخرى → الناتج 612.00 ريال (بدون حد أقصى)
+      9) مبلغ 20000 ريال – الإنماء – المدارس والجامعات → الناتج 200.80 ريال (تطبيق حد أقصى)
+      10) مبلغ 50000 ريال – الراجحي – المطاعم المحلية → الناتج 200.00 ريال (تطبيق حد أقصى)
+      11) مبلغ 10000 ريال – الراجحي – المتاجر الإلكترونية → الناتج 50.00 ريال (تطبيق حد أقصى)
+      12) مبلغ 2000 ريال – الأهلي – محطات البنزين → الناتج 100.00 ريال (تطبيق حد أقصى)
+      13) مبلغ 20000 ريال – النايفات – مطاعم → الناتج 500.00 ريال (تطبيق حد أقصى)
+      14) مبلغ 1000 ريال – الراجحي – المشتريات المحلية الأخرى → تظهر توصية (الإنماء إنفينيت)
+      15) مبلغ 1000 ريال – الراجحي – المشتريات الدولية الأخرى → تظهر توصية (برق أو D360)
+      16) مبلغ 1000 ريال – الأهلي – المطاعم المحلية وتطبيقات التوصيل → تظهر توصية (الراجحي كاش باك بلس أو النايفات)
+      17) مبلغ 1000 ريال – الأهلي – السوبرماركت → تظهر توصية (الراجحي كاش بلس)
+      18) مبلغ 1000 ريال – الأهلي – العمليات الدولية (باستثناء اليورو) → تظهر توصية (برق أو D360)
+      19) مبلغ 1000 ريال – النايفات – أخرى → الناتج 2.50 ريال
+      20) مبلغ 1000 ريال – الأهلي – أخرى → تظهر توصية (الإنماء إنفينيت)
+      21) مبلغ 1000 ريال – النايفات – الخدمات الطبية والصيدليات → الناتج 50.00 ريال
+      22) مبلغ 1000 ريال – النايفات – سوبر ماركت → تظهر توصية (الراجحي كاش باك بلس)
+      23) مبلغ 1000 ريال – النايفات – المتاجر الإلكترونية والخدمات الرقمية → تظهر توصية (الإنماء إنفينيت)
+      24) مبلغ 1000 ريال – النايفات – خدمات السفر والفنادق → تظهر توصية (الإنماء إنفينيت)
+      25) مبلغ 1000 ريال – النايفات – أخرى → تظهر توصية (الإنماء إنفينيت)
+    */
+  </script>
+</body>
+</html>
