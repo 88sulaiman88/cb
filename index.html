@@ -40,6 +40,7 @@
     <button type="button" onclick="calculateCashback()">احسب الكاش باك</button>
 
     <div class="result" id="result"></div>
+    <div class="hint" id="percent"></div>
     <div class="hint" id="hint"></div>
   </div>
 
@@ -48,26 +49,27 @@
     // ملاحظة: بعض الفئات لديها حد أقصى للاسترداد (cap) ويتم تطبيقه لكل عملية.
     const rates = {
       rajhi: {
-        restaurants: { label: 'مطاعم وكافيهات', rate: 0.10 },
-        supermarket: { label: 'سوبرماركت', rate: 0.06 },
-        online: { label: 'متاجر إلكترونية', rate: 0.02 },
-        international: { label: 'مشتريات دولية', rate: 0.015 },
-        other: { label: 'أخرى', rate: 0.005 }
+        restaurants: { label: 'المطاعم المحلية', rate: 0.10, cap: 200 },
+        supermarket: { label: 'السوبرماركت المحلية', rate: 0.06, cap: 200 },
+        online: { label: 'المتاجر الإلكترونية', rate: 0.02, cap: 50 },
+        international: { label: 'المشتريات الدولية الأخرى', rate: 0.015, cap: 200 },
+        other: { label: 'المشتريات المحلية الأخرى', rate: 0.005, cap: 200 },
+        _bankCap: { label: '__bankcap__', rate: 1, cap: 500 }
       },
       snb: {
-        fuel: { label: 'محطات البنزين', rate: 0.11 },
-        restaurants: { label: 'المطاعم المحلية', rate: 0.05 },
-        supermarket: { label: 'السوبرماركت', rate: 0.05 },
-        pharmacy: { label: 'الصيدليات', rate: 0.05 },
-        international: { label: 'العمليات الدولية', rate: 0.02 },
+        fuel: { label: 'محطات البنزين', rate: 0.11, cap: 100, mcc: ['5172','5542','5541'] },
+        restaurants: { label: 'المطاعم المحلية وتطبيقات التوصيل', rate: 0.05, cap: 200, mcc: ['5814','5813','5812'] },
+        supermarket: { label: 'السوبرماركت', rate: 0.05, cap: 200, mcc: ['5422','5451','5411'] },
+        pharmacy: { label: 'الصيدليات', rate: 0.05, cap: 200, mcc: ['5912'] },
+        international: { label: 'العمليات الدولية (باستثناء اليورو)', rate: 0.02 },
         other: { label: 'أخرى', rate: 0.007 }
       },
       nayifat: {
-        restaurants: { label: 'مطاعم', rate: 0.05 },
-        supermarket: { label: 'سوبرماركت', rate: 0.03 },
-        online: { label: 'خدمات رقمية', rate: 0.01 },
-        travel: { label: 'سفر وفنادق', rate: 0.015 },
-        other: { label: 'أخرى', rate: 0.0025 }
+        restaurants: { label: 'مطاعم', rate: 0.05, cap: 500 },
+        supermarket: { label: 'سوبرماركت', rate: 0.03, cap: 500 },
+        online: { label: 'خدمات رقمية', rate: 0.01, cap: 500 },
+        travel: { label: 'سفر وفنادق', rate: 0.015, cap: 500 },
+        other: { label: 'أخرى', rate: 0.0025, cap: 500 }
       },
       enbd: {
         restaurants: { label: 'المطاعم', rate: 0.10 },
@@ -89,6 +91,10 @@
       document.getElementById('hint').innerText = text || '';
     }
 
+    function setPercent(text) {
+      document.getElementById('percent').innerText = text || '';
+    }
+
     // تحديث التصنيفات عند اختيار البنك
     function updateCategories() {
       const bank = document.getElementById('bank').value;
@@ -98,6 +104,9 @@
       // reset UI
       resultEl.innerText = '';
       setHint('');
+
+      // clear percentage line
+      setPercent('');
       categorySelect.innerHTML = '';
 
       if (!bank || !rates[bank]) {
@@ -111,6 +120,9 @@
       categorySelect.appendChild(placeholder);
 
       Object.keys(rates[bank]).forEach(key => {
+        // عناصر داخلية (مثل حد البنك) لا تظهر للمستخدم
+        if (key.startsWith('_')) return;
+
         const opt = document.createElement('option');
         opt.value = key;
         opt.textContent = rates[bank][key].label;
@@ -126,6 +138,7 @@
       const resultEl = document.getElementById('result');
 
       setHint('');
+      setPercent('');
 
       if (!amount || amount <= 0 || !bank || !rates[bank] || !category || !rates[bank][category]) {
         resultEl.innerText = 'الرجاء إدخال جميع البيانات بشكل صحيح';
@@ -133,18 +146,54 @@
       }
 
       const config = rates[bank][category];
+      const bankCap = (bank === 'rajhi' && rates.rajhi._bankCap && typeof rates.rajhi._bankCap.cap === 'number')
+        ? rates.rajhi._bankCap.cap
+        : null;
+
       let cashback = amount * config.rate;
       let capped = false;
 
-      // تطبيق الحد الأقصى إن وجد (لكل عملية)
+      // تطبيق الحد الأقصى للفئة إن وجد (لكل عملية)
       if (typeof config.cap === 'number' && cashback > config.cap) {
         cashback = config.cap;
         capped = true;
       }
 
+      // تطبيق الحد الأقصى الإجمالي للبنك (الراجحي) إن وجد (لكل عملية)
+      if (typeof bankCap === 'number' && cashback > bankCap) {
+        cashback = bankCap;
+        capped = true;
+      }
+
       resultEl.innerText = `قيمة الكاش باك: ${cashback.toFixed(2)} ريال`;
+
+      const baseRatePct = (config.rate * 100);
+      let percentLine = `نسبة الكاش باك: ${baseRatePct.toFixed(2)}%`;
+
+      // إذا تم تطبيق الحد، اعرض النسبة الفعلية بعد الحد
       if (capped) {
-        setHint(`تم تطبيق الحد الأقصى لهذه الفئة: ${config.cap.toFixed(2)} ريال`);
+        const effectivePct = (cashback / amount) * 100;
+        percentLine += ` (النسبة الفعلية بعد الحد: ${effectivePct.toFixed(2)}%)`;
+      }
+
+      setPercent(percentLine);
+
+      if (capped) {
+        // تحديد أي حد تم تطبيقه (حد الفئة أو حد البنك)
+        let appliedCap = null;
+        if (typeof config.cap === 'number') appliedCap = config.cap;
+        if (typeof bankCap === 'number') {
+          // إذا حد البنك أصغر (أو الحد المطبق فعليًا هو حد البنك)
+          if (appliedCap === null || bankCap < appliedCap || cashback === bankCap) {
+            appliedCap = bankCap;
+          }
+        }
+
+        if (typeof appliedCap === 'number') {
+          setHint(`تم تطبيق الحد الأقصى: ${appliedCap.toFixed(2)} ريال`);
+        } else {
+          setHint('تم تطبيق حد أقصى.');
+        }
       }
     }
 
@@ -159,6 +208,10 @@
       7) مبلغ 30000 ريال – الإنماء – عقارات → الناتج 401.60 ريال (تطبيق حد أقصى)
       8) مبلغ 30000 ريال – الإنماء – أخرى → الناتج 612.00 ريال (بدون حد أقصى)
       9) مبلغ 20000 ريال – الإنماء – المدارس والجامعات → الناتج 200.80 ريال (تطبيق حد أقصى)
+      10) مبلغ 50000 ريال – الراجحي – المطاعم المحلية → الناتج 200.00 ريال (تطبيق حد أقصى)
+      11) مبلغ 10000 ريال – الراجحي – المتاجر الإلكترونية → الناتج 50.00 ريال (تطبيق حد أقصى)
+      12) مبلغ 2000 ريال – الأهلي – محطات البنزين → الناتج 100.00 ريال (تطبيق حد أقصى)
+      13) مبلغ 20000 ريال – النايفات – مطاعم → الناتج 500.00 ريال (تطبيق حد أقصى)
     */
   </script>
 </body>
